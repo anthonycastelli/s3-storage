@@ -4,16 +4,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "StorageS3",
+    name: "S3Storage",
     products: [
-        .library(name: "StorageS3", targets: ["StorageS3"]),
+        .library(name: "S3Storage", targets: ["S3Storage"]),
     ],
     dependencies: [
         .package(url: "https://github.com/gperdomor/storage-kit.git", from: "0.1.0"),
         .package(url: "https://github.com/tadija/AEXML.git", from: "4.3.0")
     ],
     targets: [
-        .target(name: "StorageS3", dependencies: ["StorageKit", "AEXML"]),
-        .testTarget(name: "StorageS3Tests", dependencies: ["StorageS3"]),
+        .target(name: "S3Storage", dependencies: ["StorageKit", "AEXML"]),
+        .testTarget(name: "S3StorageTests", dependencies: ["S3Storage"]),
     ]
 )
