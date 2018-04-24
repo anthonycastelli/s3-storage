@@ -10,27 +10,33 @@ import HTTP
 import Crypto
 
 extension S3Adapter {
-    public func generateAuthHeader(_ httpMethod: HTTPMethod, urlString: String, headers: [String: String] = [:], payload: Data?) throws -> HTTPHeaders {
+    internal func generateAuthHeader(_ httpMethod: HTTPMethod, urlString: String, headers: [String: String] = [:], payload: Payload) throws -> HTTPHeaders {
         guard let url = URL(string: urlString) else {
             throw S3AdapterError(identifier: "invalid-url", reason: "Invalid URL", source: .capture())
         }
+        
         let dates = self.getDates(Date())
-        let bodyDigest = try SHA256.hash(payload ?? "".convertToData()).hexEncodedString()
+        let bodyDigest = try payload.hashed()
         var updatedHeaders = self.updateHeaders(headers, url: url, longDate: dates.long, bodyDigest: bodyDigest)
         
-        if httpMethod == .PUT {
-            updatedHeaders["Content-MD5"] = try MD5.hash(payload ?? "".convertToData()).hexEncodedString()
+        if httpMethod == .PUT && payload.isBytes {
+            // TODO: Figure out why S3 would fail with this
+            updatedHeaders["Content-MD5"] = try MD5.hash(payload.bytes).hexEncodedString()
         }
-        
+
         updatedHeaders["Authorization"] = try self.generateAuthHeader(httpMethod, url: url, headers: updatedHeaders, bodyDigest: bodyDigest, dates: dates)
         
         if httpMethod == .PUT {
-            updatedHeaders["Content-Length"] = payload?.count.description ?? "".convertToData().count.description
+            updatedHeaders["Content-Length"] = payload.size
             if url.pathExtension != "" {
                 updatedHeaders["Content-Type"] = url.pathExtension
             }
         }
-
+        
+        if payload.isUnsigned {
+            updatedHeaders["x-amz-content-sha256"] = bodyDigest
+        }
+        
         var headers = HTTPHeaders()
         for (key, value) in updatedHeaders {
             headers.add(name: key, value: value)
