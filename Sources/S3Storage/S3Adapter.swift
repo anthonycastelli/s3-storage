@@ -128,12 +128,13 @@ extension S3Adapter {
     
     public func listObjects(in bucket: String, prefix: String?, on container: Container) throws -> EventLoopFuture<[ObjectInfo]> {
         let client = try container.make(Client.self)
-        var urlComponents = URLComponents(string: self.region.host + bucket.finished(with: "/"))
+        var urlComponents = URLComponents(string: self.region.host)
+        urlComponents?.path = "/" + bucket
+        urlComponents?.queryItems = []
         urlComponents?.queryItems?.append(URLQueryItem(name: "list-type", value: "2"))
         if let prefix = prefix {
             urlComponents?.queryItems?.append(URLQueryItem(name: "prefix", value: prefix))
         }
-        
         guard let url = urlComponents?.url else {
             throw S3AdapterError(identifier: "list", reason: "Couldnt not generate a valid URL path.", source: .capture())
         }
@@ -150,6 +151,7 @@ extension S3Adapter {
             guard let data = response.http.body.data else {
                 throw S3AdapterError(identifier: "list", reason: "Couldnt not extract the data from the request.", source: .capture())
             }
+            print(String(bytes: data, encoding: .utf8)!)
             let xml = try AEXMLDocument(xml: data)
             let items = xml.root.allDescendants(where: { $0.name == "Contents" }).map({ Dictionary($0.children.compactMap({ [$0.name: $0.value ?? ""] }).reduce([], { $0 + $1 })) })
             return items.map({ ObjectInfo(name: $0["Key"] ?? "", prefix: $0["Prefix"], size: Int($0["Size"] ?? "0"), etag: $0["ETag"] ?? "", lastModified: Date(string: $0["LastModified"] ?? "")) })
