@@ -46,7 +46,7 @@ public enum Region: String {
     /// Asia Pacific (Singapore)
     case apSoutheast1 = "ap-southeast-1"
     
-    /// Asia Pacific (Sydney
+    /// Asia Pacific (Sydney)
     case apSoutheast2 = "ap-southeast-2"
     
     /// Asia Pacific (Mumbai)
