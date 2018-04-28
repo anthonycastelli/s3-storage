@@ -42,14 +42,14 @@ extension AdapterIdentifier {
 /// `S3Adapter` provides an interface that allows the handeling of files
 /// between Amazon's S3 Simple Storage Solution
 public class S3Adapter: Adapter {
+    /// The region where S3 bucket is located.
+    public let region: Region
+    
     /// AWS Access Key
     let accessKey: String
     
     /// AWS Secret Key
     let secretKey: String
-    
-    /// The region where S3 bucket is located.
-    let region: Region
     
     /// AWS Security Token. Used to validate temporary credentials, such as
     /// those from an EC2 Instance's IAM role
