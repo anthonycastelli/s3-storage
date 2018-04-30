@@ -86,6 +86,9 @@ extension S3Adapter {
         request.http.body = HTTPBody(data: content)
         request.http.url = url
         return try client.respond(to: request).map(to: ObjectInfo.self) { response in
+            guard response.http.status == .ok else {
+                throw S3AdapterError(identifier: "create", reason: "Couldnt not create the file.", source: .capture())
+            }
             return ObjectInfo(name: url.lastPathComponent, prefix: nil, size: nil, etag: "MD5-Hash", lastModified: Date())
         }
     }
