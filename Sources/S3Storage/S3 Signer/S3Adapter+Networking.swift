@@ -20,8 +20,7 @@ extension S3Adapter {
         var updatedHeaders = self.updateHeaders(headers, url: url, longDate: dates.long, bodyDigest: bodyDigest)
         
         if httpMethod == .PUT && payload.isBytes {
-            // TODO: Figure out why S3 would fail with this
-            updatedHeaders["Content-MD5"] = try MD5.hash(payload.bytes).hexEncodedString()
+            updatedHeaders["Content-MD5"] = try MD5.hash(payload.bytes).base64EncodedString()
         }
 
         updatedHeaders["Authorization"] = try self.generateAuthHeader(httpMethod, url: url, headers: updatedHeaders, bodyDigest: bodyDigest, dates: dates)
