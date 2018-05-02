@@ -42,6 +42,7 @@ extension AdapterIdentifier {
 /// `S3Adapter` provides an interface that allows the handeling of files
 /// between Amazon's S3 Simple Storage Solution
 public class S3Adapter: Adapter {
+    
     /// The region where S3 bucket is located.
     public let region: Region
     
@@ -73,7 +74,7 @@ extension S3Adapter {
         throw S3AdapterError(identifier: "copy", reason: "Currently not implemented.", source: .capture())
     }
     
-    public func create(object: String, in bucket: String, with content: Data, metadata: Codable?, on container: Container) throws -> EventLoopFuture<ObjectInfo> {
+    public func create(object: String, in bucket: String, with content: Data, metadata: StorageMetadata?, on container: Container) throws -> EventLoopFuture<ObjectInfo> {
         let client = try container.make(Client.self)
         guard let url = URL(string: self.region.host + bucket.finished(with: "/") + object) else {
             throw S3AdapterError(identifier: "write", reason: "Couldnt not generate a valid URL path.", source: .capture())
@@ -87,9 +88,9 @@ extension S3Adapter {
         request.http.url = url
         return try client.respond(to: request).map(to: ObjectInfo.self) { response in
             guard response.http.status == .ok else {
-                throw S3AdapterError(identifier: "create", reason: "Couldnt not create the file.", source: .capture())
+                throw S3AdapterError(identifier: "create", reason: "Couldnt not create file.", source: .capture())
             }
-            return ObjectInfo(name: url.lastPathComponent, prefix: nil, size: nil, etag: "MD5-Hash", lastModified: Date())
+            return ObjectInfo(name: url.lastPathComponent, prefix: nil, size: nil, etag: "MD5-Hash", lastModified: Date(), url: url)
         }
     }
     
@@ -154,16 +155,24 @@ extension S3Adapter {
             guard let data = response.http.body.data else {
                 throw S3AdapterError(identifier: "list", reason: "Couldnt not extract the data from the request.", source: .capture())
             }
-            print(String(bytes: data, encoding: .utf8)!)
             let xml = try AEXMLDocument(xml: data)
             let items = xml.root.allDescendants(where: { $0.name == "Contents" }).map({ Dictionary($0.children.compactMap({ [$0.name: $0.value ?? ""] }).reduce([], { $0 + $1 })) })
-            return items.map({ ObjectInfo(name: $0["Key"] ?? "", prefix: $0["Prefix"], size: Int($0["Size"] ?? "0"), etag: $0["ETag"] ?? "", lastModified: Date(string: $0["LastModified"] ?? "")) })
+            return items.map({
+                ObjectInfo(
+                    name: $0["Key"] ?? "",
+                    prefix: $0["Prefix"],
+                    size: Int($0["Size"] ?? "0"),
+                    etag: $0["ETag"] ?? "",
+                    lastModified: Date(string: $0["LastModified"] ?? ""),
+                    url: URL(string: self.region.host + bucket.finished(with: "/") + ($0["Key"] ?? ""))
+                )
+            })
         }
     }
 }
 
 extension S3Adapter {
-    public func create(bucket: String, metadata: Codable?, on container: Container) throws -> EventLoopFuture<Void> {
+    public func create(bucket: String, metadata: StorageMetadata?, on container: Container) throws -> EventLoopFuture<Void>  {
         fatalError("Not implemented")
     }
     
