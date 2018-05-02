@@ -79,7 +79,18 @@ extension S3Adapter {
         guard let url = URL(string: self.region.host + bucket.finished(with: "/") + object) else {
             throw S3AdapterError(identifier: "write", reason: "Couldnt not generate a valid URL path.", source: .capture())
         }
-        let headers = try self.generateAuthHeader(.PUT, urlString: url.absoluteString, payload: .bytes(content))
+        
+        // Create any ACL headers we need
+        var aclHeaders = [String : String]()
+        if let metadata = metadata {
+            if let predefinedACL = metadata.predefinedACL?.header {
+                if let key = predefinedACL.keys.first, let value = predefinedACL.values.first {
+                    aclHeaders[key] = value
+                }
+            }
+        }
+        
+        let headers = try self.generateAuthHeader(.PUT, urlString: url.absoluteString, headers: aclHeaders, payload: .bytes(content))
         
         let request = Request(using: container)
         request.http.method = .PUT
