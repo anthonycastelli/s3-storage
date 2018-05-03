@@ -14,8 +14,8 @@ struct AWSEncoding {
 
 extension String {
     func awsStringEncoding(_ type: String) -> String? {
-        let allowed = NSMutableCharacterSet.alphanumeric()
-        allowed.addCharacters(in: type)
-        return self.addingPercentEncoding(withAllowedCharacters: allowed as CharacterSet)
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: type)
+        return self.addingPercentEncoding(withAllowedCharacters: allowed)
     }
 }
