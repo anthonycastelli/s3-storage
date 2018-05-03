@@ -59,26 +59,42 @@ public class S3Adapter: Adapter {
     /// Used within the AWS HMAC signing
     let service = "s3"
     
+    let host: URL
+    
     /// Create a new Local adapter.
-    public init(accessKey: String, secretKey: String, region: Region, securityToken: String? = nil) throws {
+    public init(host: URL = URL(string: "https://s3.amazonaws.com")!, accessKey: String, secretKey: String, region: Region, securityToken: String? = nil) throws {
         self.accessKey = accessKey
         self.secretKey = secretKey
         self.region = region
         self.securityToken = securityToken
+        self.host = host
     }
 }
 
 /// Handles all of the network requests
 extension S3Adapter {
+    private func isAmazonURL() -> Bool {
+        return self.host.absoluteString == "https://s3.amazonaws.com"
+    }
+    
+    private func getProperURL(bucket: String, object: String) throws -> URL {
+        if self.isAmazonURL() {
+            guard let url = URL(string: self.region.host + bucket.finished(with: "/") + object) else {
+                throw S3AdapterError(identifier: "write", reason: "Couldnt not generate a valid URL path.", source: .capture())
+            }
+            return url
+        } else {
+            return self.host.appendingPathComponent(bucket).appendingPathComponent(object)
+        }
+    }
+    
     public func copy(object: String, from bucket: String, as: String, to targetBucket: String, on container: Container) throws -> EventLoopFuture<ObjectInfo> {
         throw S3AdapterError(identifier: "copy", reason: "Currently not implemented.", source: .capture())
     }
     
     public func create(object: String, in bucket: String, with content: Data, metadata: StorageMetadata?, on container: Container) throws -> EventLoopFuture<ObjectInfo> {
         let client = try container.make(Client.self)
-        guard let url = URL(string: self.region.host + bucket.finished(with: "/") + object) else {
-            throw S3AdapterError(identifier: "write", reason: "Couldnt not generate a valid URL path.", source: .capture())
-        }
+        let url = try getProperURL(bucket: bucket, object: object)
         
         // Create any ACL headers we need
         var aclHeaders = [String : String]()
@@ -91,12 +107,12 @@ extension S3Adapter {
         }
         
         let headers = try self.generateAuthHeader(.PUT, urlString: url.absoluteString, headers: aclHeaders, payload: .bytes(content))
-        
         let request = Request(using: container)
         request.http.method = .PUT
         request.http.headers = headers
-        request.http.body = HTTPBody(data: content)
         request.http.url = url
+        request.http.body = HTTPBody(data: content)
+        
         return try client.respond(to: request).map(to: ObjectInfo.self) { response in
             guard response.http.status == .ok else {
                 throw S3AdapterError(identifier: "create", reason: "Couldnt not create file.", source: .capture())
@@ -107,16 +123,15 @@ extension S3Adapter {
     
     public func delete(object: String, in bucket: String, on container: Container) throws -> EventLoopFuture<Void> {
         let client = try container.make(Client.self)
-        guard let url = URL(string: self.region.host + bucket.finished(with: "/") + object) else {
-            throw S3AdapterError(identifier: "get", reason: "Couldnt not generate a valid URL path.", source: .capture())
-        }
+        let url = try getProperURL(bucket: bucket, object: object)
         let headers = try self.generateAuthHeader(.DELETE, urlString: url.absoluteString, payload: .none)
         let request = Request(using: container)
         request.http.method = .DELETE
         request.http.headers = headers
         request.http.url = url
+        
         return try client.respond(to: request).map(to: Void.self) { response in
-            guard response.http.status == .ok else {
+            guard response.http.status == .noContent else {
                 throw S3AdapterError(identifier: "delete", reason: "Couldnt not delete the file.", source: .capture())
             }
             return ()
@@ -125,14 +140,13 @@ extension S3Adapter {
     
     public func get(object: String, in bucket: String, on container: Container) throws -> EventLoopFuture<Data> {
         let client = try container.make(Client.self)
-        guard let url = URL(string: self.region.host + bucket.finished(with: "/") + object) else {
-            throw S3AdapterError(identifier: "get", reason: "Couldnt not generate a valid URL path.", source: .capture())
-        }
+        let url = try getProperURL(bucket: bucket, object: object)
         let headers = try self.generateAuthHeader(.GET, urlString: url.absoluteString, payload: .none)
         let request = Request(using: container)
         request.http.method = .GET
         request.http.headers = headers
         request.http.url = url
+        
         return try client.respond(to: request).map(to: Data.self) { response in
             guard let data = response.http.body.data else {
                 throw S3AdapterError(identifier: "get", reason: "Couldnt not extract data from the request.", source: .capture())
@@ -143,7 +157,7 @@ extension S3Adapter {
     
     public func listObjects(in bucket: String, prefix: String?, on container: Container) throws -> EventLoopFuture<[ObjectInfo]> {
         let client = try container.make(Client.self)
-        var urlComponents = URLComponents(string: self.region.host)
+        var urlComponents = URLComponents(string: self.isAmazonURL() ? self.region.host : self.host.absoluteString)
         urlComponents?.path = "/" + bucket
         urlComponents?.queryItems = []
         urlComponents?.queryItems?.append(URLQueryItem(name: "list-type", value: "2"))
