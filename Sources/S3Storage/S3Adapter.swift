@@ -131,7 +131,7 @@ extension S3Adapter {
         guard let url = URL(string: self.region.host + bucket.finished(with: "/") + object) else {
             throw S3AdapterError(identifier: "get", reason: "Couldnt not generate a valid URL path.", source: .capture())
         }
-        let headers = try self.self.signer.authHeader(for: .GET, to: url, payload: .none)
+        let headers = try self.signer.authHeader(for: .GET, to: url, payload: .none)
         let request = Request(using: container)
         request.http.method = .GET
         request.http.headers = headers
