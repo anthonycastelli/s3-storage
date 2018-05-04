@@ -9,11 +9,12 @@ let package = Package(
         .library(name: "S3Storage", targets: ["S3Storage"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/anthonycastelli/simplestoragesigner.git", .branch("master")),
         .package(url: "https://github.com/gperdomor/storage-kit.git", from: "0.1.0"),
         .package(url: "https://github.com/tadija/AEXML.git", from: "4.3.0")
     ],
     targets: [
-        .target(name: "S3Storage", dependencies: ["StorageKit", "AEXML"]),
+        .target(name: "S3Storage", dependencies: ["SimpleStorageSigner", "StorageKit", "AEXML"]),
         .testTarget(name: "S3StorageTests", dependencies: ["S3Storage"]),
     ]
 )

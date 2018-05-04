@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SimpleStorageSigner
 import Vapor
 import AEXML
 
@@ -56,8 +57,8 @@ public class S3Adapter: Adapter {
     /// those from an EC2 Instance's IAM role
     let securityToken : String?
     
-    /// Used within the AWS HMAC signing
-    let service = "s3"
+    /// The Simple Storage Signer to generate the auth headers
+    let signer: SimpleStorageSigner!
     
     /// Create a new Local adapter.
     public init(accessKey: String, secretKey: String, region: Region, securityToken: String? = nil) throws {
@@ -65,6 +66,8 @@ public class S3Adapter: Adapter {
         self.secretKey = secretKey
         self.region = region
         self.securityToken = securityToken
+        
+        self.signer = SimpleStorageSigner(accessKey: accessKey, secretKey: secretKey, region: region)
     }
 }
 
@@ -90,8 +93,8 @@ extension S3Adapter {
             }
         }
         
-        let headers = try self.generateAuthHeader(.PUT, urlString: url.absoluteString, headers: aclHeaders, payload: .bytes(content))
-        
+        let headers = try self.signer.authHeader(for: .PUT, to: url, headers: aclHeaders, payload: .data(content))
+
         let request = Request(using: container)
         request.http.method = .PUT
         request.http.headers = headers
@@ -110,13 +113,13 @@ extension S3Adapter {
         guard let url = URL(string: self.region.host + bucket.finished(with: "/") + object) else {
             throw S3AdapterError(identifier: "get", reason: "Couldnt not generate a valid URL path.", source: .capture())
         }
-        let headers = try self.generateAuthHeader(.DELETE, urlString: url.absoluteString, payload: .none)
+        let headers = try self.signer.authHeader(for: .DELETE, to: url, payload: .none)
         let request = Request(using: container)
         request.http.method = .DELETE
         request.http.headers = headers
         request.http.url = url
         return try client.respond(to: request).map(to: Void.self) { response in
-            guard response.http.status == .ok else {
+            guard response.http.status == .noContent else {
                 throw S3AdapterError(identifier: "delete", reason: "Couldnt not delete the file.", source: .capture())
             }
             return ()
@@ -128,7 +131,7 @@ extension S3Adapter {
         guard let url = URL(string: self.region.host + bucket.finished(with: "/") + object) else {
             throw S3AdapterError(identifier: "get", reason: "Couldnt not generate a valid URL path.", source: .capture())
         }
-        let headers = try self.generateAuthHeader(.GET, urlString: url.absoluteString, payload: .none)
+        let headers = try self.self.signer.authHeader(for: .GET, to: url, payload: .none)
         let request = Request(using: container)
         request.http.method = .GET
         request.http.headers = headers
@@ -154,7 +157,7 @@ extension S3Adapter {
             throw S3AdapterError(identifier: "list", reason: "Couldnt not generate a valid URL path.", source: .capture())
         }
         
-        let headers = try self.generateAuthHeader(.GET, urlString: url.absoluteString, payload: .none)
+        let headers = try self.signer.authHeader(for: .GET, to: url, payload: .none)
         let request = Request(using: container)
         request.http.method = .GET
         request.http.headers = headers
