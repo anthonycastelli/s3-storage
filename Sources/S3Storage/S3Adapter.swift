@@ -100,7 +100,7 @@ extension S3Adapter {
         request.http.headers = headers
         request.http.body = HTTPBody(data: content)
         request.http.url = url
-        return try client.respond(to: request).map(to: ObjectInfo.self) { response in
+        return client.send(request).map(to: ObjectInfo.self) { response in
             guard response.http.status == .ok else {
                 throw S3AdapterError(identifier: "create", reason: "Couldnt not create file.", source: .capture())
             }
@@ -118,7 +118,7 @@ extension S3Adapter {
         request.http.method = .DELETE
         request.http.headers = headers
         request.http.url = url
-        return try client.respond(to: request).map(to: Void.self) { response in
+        return client.send(request).map(to: Void.self) { response in
             guard response.http.status == .noContent else {
                 throw S3AdapterError(identifier: "delete", reason: "Couldnt not delete the file.", source: .capture())
             }
@@ -136,7 +136,7 @@ extension S3Adapter {
         request.http.method = .GET
         request.http.headers = headers
         request.http.url = url
-        return try client.respond(to: request).map(to: Data.self) { response in
+        return client.send(request).map(to: Data.self) { response in
             guard let data = response.http.body.data else {
                 throw S3AdapterError(identifier: "get", reason: "Couldnt not extract data from the request.", source: .capture())
             }
@@ -162,7 +162,7 @@ extension S3Adapter {
         request.http.method = .GET
         request.http.headers = headers
         request.http.url = url
-        return try client.respond(to: request).map(to: [ObjectInfo].self) { response in
+        return client.send(request).map(to: [ObjectInfo].self) { response in
             guard response.http.status == .ok else {
                 throw S3AdapterError(identifier: "list", reason: "Error: \(response.http.status.reasonPhrase). There requested returned a \(response.http.status.code)", source: .capture())
             }
